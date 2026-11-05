@@ -381,3 +381,15 @@ main{flex:1;min-width:0;display:flex;flex-direction:column}
 .tbl tbody tr.lootrow.legendary td{color:var(--r-legendary)}
 .tbl tbody tr.lootrow.unique td{color:var(--r-unique)}
 .tbl tbody tr.lootrow.mythic td{color:var(--r-mythic)}
+
+/* ---------------------------------------------------------------- 顶栏：全局锁帧 + 退出 */
+.lockgroup{display:flex;align-items:center;gap:5px;margin-right:4px;padding-right:10px;border-right:1px solid var(--line)}
+.lockgroup .lk-label{font-size:12px;color:var(--ink3)}
+.lockgroup .lk{
+  height:28px;min-width:38px;padding:0 9px;border:1px solid var(--line);border-radius:6px;
+  background:#fff;font-size:12px;font-family:var(--mono);color:var(--ink2);transition:all .12s;
+}
+.lockgroup .lk:hover{background:#f9fafb;border-color:#d7dbe2}
+.lockgroup .lk.on{background:var(--blue-soft);border-color:#dbe6ff;color:var(--blue);font-weight:600}
+.btn.exit{color:var(--ink2)}
+.btn.exit:hover{color:var(--red);border-color:#fecdca;background:var(--red-soft)}

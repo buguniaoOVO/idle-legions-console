@@ -43,7 +43,7 @@ const RANK = { common: 0, uncommon: 1, rare: 2, epic: 3, legendary: 4, unique: 5
 const SRC = { drop: '掉落', chest: '宝箱', shop: '商店', forge: '强化', boss: '首领', pet: '宠物' };
 
 /* 控制台自身：版本号、发布页、赞助入口。界面只露版本号，任何地方都不显示仓库地址。 */
-const CONSOLE_VERSION = '2.1.0';
+const CONSOLE_VERSION = '2.1.1';
 const GITHUB_REPO = { owner: 'buguniaoOVO', repo: 'idle-legions-console' };
 const SPONSOR_URL = 'https://afdian.com/a/Awan0v0?utm_source=copylink&utm_medium=link';
 
@@ -195,8 +195,17 @@ function renderChrome(s) {
     sandbox: [['primary', '启动全部沙箱', 'launchall'], ['', '部署全部', 'deployall']],
     settings: [['', '刷新', 'refresh']],
   }[state.page] || [];
-  $('#topacts').innerHTML = acts.map(([cls, label, act]) =>
-    `<button class="btn ${cls}" data-top="${act}">${esc(label)}</button>`).join('');
+  // 顶部工具条：全局锁帧 + 本页动作 + 退出（退出和开始/停止同一排）
+  const fpsAll = (s.instances || []).map((i) => Number(i.fps || 0));
+  const commonFps = fpsAll.length && fpsAll.every((v) => v === fpsAll[0]) ? fpsAll[0] : null;
+  const lockGroup = ['inst', 'sandbox'].includes(state.page)
+    ? `<div class="lockgroup"><span class="lk-label">锁帧</span>${[10, 30, 0].map((v) =>
+        `<button class="lk ${commonFps === v ? 'on' : ''}" data-global-lock="1" data-fps="${v}"
+          title="全局锁帧：${v === 0 ? '不限制' : '锁定 ' + v + ' 帧'}（写入每个实例 settings.cfg，重启实例生效）">${v === 0 ? '不锁' : v}</button>`).join('')}</div>`
+    : '';
+  $('#topacts').innerHTML = lockGroup
+    + acts.map(([cls, label, act]) => `<button class="btn ${cls}" data-top="${act}">${esc(label)}</button>`).join('')
+    + '<button class="btn exit" data-exit="1" title="退出中控（右上角 X 只是缩到任务栏）">退出</button>';
 }
 
 /* ------------------------------------------------------------------ 账号状态 */
@@ -722,7 +731,7 @@ async function batchCfg(ports, patch, quiet) {
 function allPorts() { return (state.snap.instances || []).map((i) => i.port); }
 
 document.addEventListener('click', async (ev) => {
-  const t = ev.target.closest('[data-goto],[data-top],[data-pow],[data-win],[data-kill],[data-detail],[data-tab],[data-cfg],[data-run],[data-syncall],[data-rar],[data-src],[data-box-launch],[data-box-deploy],[data-box-show],[data-box-kill],[data-pid-win],[data-pid-kill],[data-op],[data-alias],[data-restart],[data-official],[data-fix],[data-relay]');
+  const t = ev.target.closest('[data-goto],[data-top],[data-pow],[data-win],[data-kill],[data-detail],[data-tab],[data-cfg],[data-run],[data-syncall],[data-rar],[data-src],[data-box-launch],[data-box-deploy],[data-box-show],[data-box-kill],[data-pid-win],[data-pid-kill],[data-op],[data-alias],[data-restart],[data-official],[data-fix],[data-relay],[data-lock],[data-global-lock],[data-sponsor],[data-github],[data-exit],[data-check-update]');
   if (!t) return;
   const s = state.snap;
   if (!s) return;
@@ -806,13 +815,47 @@ document.addEventListener('click', async (ev) => {
     if (!i) return;
     if (i.target === null) return toast('位置未知，不写文件', 'bad');
     const fps = Number(t.dataset.fps);
-    if (Number(i.fps || 0) === fps) return;
+    const name = i.alias || i.account || ('端口 ' + i.port);
+    if (Number(i.fps || 0) === fps && !i.running) return;
     const r = await api('/api/fps', { scopes: [i.target === '' ? '本机' : i.target], fps });
+    if (!r.ok) return toast(r.error || '写入失败', 'bad');
+    await refresh(true);
     const off = (r.results || []).some((x) => x.vsync_off);
-    toast(r.ok
-      ? `${i.alias || i.account || ('端口 ' + i.port)} 已设为 ${fps === 0 ? '不限制' : fps + ' 帧'}${off ? '（顺带关垂直同步）' : ''}，重启实例生效`
-      : (r.error || '写入失败'), r.ok ? 'ok' : 'bad');
-    return setTimeout(() => refresh(true), 800);
+    if (i.running && confirm(`${name} 已写入 ${fps === 0 ? '不限制' : fps + ' 帧'}${off ? '（顺带关垂直同步）' : ''}。\n\nmax_fps 只在游戏启动时读，现在重启这个实例让锁帧生效？`)) {
+      await api('/api/kill', { pids: [i.pid] });
+      await new Promise((res) => setTimeout(res, 1200));
+      await api('/api/launch', i.target === '' ? { count: 1 } : { box: i.target });
+      toast(`${name} 正在重启，${fps === 0 ? '已解除锁帧' : '锁帧 ' + fps + ' 帧'} 会在启动时生效`, 'ok');
+      return setTimeout(() => refresh(true), 4000);
+    }
+    return toast(`${name} 已标记 ${fps === 0 ? '不限制' : fps + ' 帧'}，重启实例后生效`, 'ok');
+  }
+  if (t.dataset.globalLock !== undefined) {
+    const fps = Number(t.dataset.fps);
+    const scopes = (s.instances || []).filter((x) => x.target !== null).map((x) => (x.target === '' ? '本机' : x.target));
+    if (!scopes.length) return toast('没有可写设置的实例', 'bad');
+    const r = await api('/api/fps', { scopes, fps });
+    if (!r.ok) return toast(r.error || '写入失败', 'bad');
+    await refresh(true);
+    const running = (s.instances || []).filter((x) => x.running);
+    if (running.length && confirm(`已给 ${scopes.length} 个位置写入 ${fps === 0 ? '不限制' : fps + ' 帧'}。\n\n重启这 ${running.length} 个正在跑的实例，让锁帧立刻生效？`)) {
+      for (const x of running) {
+        await api('/api/kill', { pids: [x.pid] });
+        await new Promise((res) => setTimeout(res, 900));
+        if (x.target !== null) await api('/api/launch', x.target === '' ? { count: 1 } : { box: x.target });
+      }
+      toast('正在重启实例，启动后按新档位跑', 'ok');
+      return setTimeout(() => refresh(true), 5000);
+    }
+    return toast(`已写入 ${fps === 0 ? '不限制' : fps + ' 帧'}（${scopes.length} 个位置），重启实例后生效`, 'ok');
+  }
+  if (t.dataset.exit !== undefined) {
+    if (window.pywebview && window.pywebview.api && window.pywebview.api.quit) {
+      await window.pywebview.api.quit();
+      return;
+    }
+    await api('/api/quit', {});
+    return toast('已退出', 'ok');
   }
   if (t.dataset.checkUpdate) return checkConsoleUpdate(true);
   if (t.dataset.sponsor) return openSponsor();
