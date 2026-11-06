@@ -1,4 +1,4 @@
-﻿<#
+<#
   给每个游戏用户目录装上限帧钩子（cap.gd + autoload 行）。
   用法: powershell -ExecutionPolicy Bypass -File .\tools\install-cap.ps1
 #>
@@ -7,6 +7,13 @@ $nl = [Environment]::NewLine
 $capSrc = Join-Path (Split-Path $PSScriptRoot -Parent) 'helper\cap.gd'
 if (-not (Test-Path $capSrc)) { throw "找不到 cap.gd：$capSrc" }
 $line = 'IdleLegionsCap="*user://x1x_legions/cap.gd"'
+
+# 注意：必须在游戏关闭时运行。游戏保存窗口位置时会重写 ventana_inicio.cfg，
+# 如果那一刻钩子还没加载，IdleLegionsCap 这一行会被冲掉，所以先关游戏再跑这个脚本。
+$running = @(Get-Process client -ErrorAction SilentlyContinue)
+if ($running.Count -gt 0) {
+  Write-Host ('警告：现在有 ' + $running.Count + ' 个游戏客户端在跑，先关掉再运行本脚本，否则那一行可能被游戏重写掉。')
+}
 
 $targets = @((Join-Path $env:APPDATA 'Godot\app_userdata\Idle Legions'))
 $sandboxRoot = 'D:\Sandbox'
