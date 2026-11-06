@@ -11,13 +11,14 @@ from PIL import Image
 
 
 def build_frames(src_png):
-    im = Image.open(src_png).convert('RGB')
+    im = Image.open(src_png).convert('RGBA')
     budgets = {16: 176, 24: 251, 32: 300, 48: 421, 64: 498, 128: 1174, 256: 2720}
     frames = {}
     for size, budget in budgets.items():
         frame = im.resize((size, size), Image.LANCZOS)
         chosen = None
         for colors in (256, 128, 96, 64, 48, 32, 24, 16, 12, 8, 6, 4, 3, 2):
+            # 保留透明通道：RGBA 直接 quantize，会写成带 tRNS 的调色板 PNG
             q = frame.quantize(colors=colors, method=Image.FASTOCTREE)
             buf = io.BytesIO()
             q.save(buf, format='PNG', optimize=True,

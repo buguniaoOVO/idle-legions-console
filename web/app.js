@@ -43,7 +43,7 @@ const RANK = { common: 0, uncommon: 1, rare: 2, epic: 3, legendary: 4, unique: 5
 const SRC = { drop: '掉落', chest: '宝箱', shop: '商店', forge: '强化', boss: '首领', pet: '宠物' };
 
 /* 控制台自身：版本号、发布页、赞助入口。界面只露版本号，任何地方都不显示仓库地址。 */
-const CONSOLE_VERSION = '2.1.3';
+const CONSOLE_VERSION = '2.1.4';
 const GITHUB_REPO = { owner: 'buguniaoOVO', repo: 'idle-legions-console' };
 const SPONSOR_URL = 'https://afdian.com/a/Awan0v0?utm_source=copylink&utm_medium=link';
 
