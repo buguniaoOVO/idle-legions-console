@@ -30,7 +30,7 @@
         <svg viewBox="0 0 16 16"><path d="M8 1.8l5.2 3v6.4L8 14.2 2.8 11.2V4.8z"/><path d="M2.8 4.8L8 7.9l5.2-3.1M8 7.9v6.3"/></svg>
         <span>沙箱</span><em id="navBox">0</em>
       </button>
-      <button data-page="official">
+      <button data-page="helpers">
         <svg viewBox="0 0 16 16"><circle cx="8" cy="8" r="6.2"/><path d="M1.8 8h12.4M8 1.8c3.2 3.4 3.2 9 0 12.4M8 1.8c-3.2 3.4-3.2 9 0 12.4"/></svg>
         <span>助手设置</span>
       </button>
@@ -97,6 +97,16 @@
       <div class="kpis" id="lootKpis"></div>
       <div class="filters" id="lootFilter"></div>
       <div class="tablecard"><table class="tbl" id="lootTable"></table></div>
+    </section>
+
+    <!-- 助手设置（选环境） -->
+    <section class="page hidden" id="page-helpers">
+      <div class="bar">
+        <div class="barleft"><h2>助手环境</h2><span class="count" id="helperCount">0 个</span></div>
+        <div class="barright"><button class="btn" data-top="deployall">部署到全部</button><button class="btn" data-top="updateall">更新全部助手</button></div>
+      </div>
+      <p class="note">内嵌页面由 X1X 官网提供，需要联网；「打开助手设置」会带着该环境的配对信息打开。</p>
+      <div class="cards" id="helperCards"></div>
     </section>
 
     <!-- 沙箱 -->

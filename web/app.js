@@ -43,7 +43,7 @@ const RANK = { common: 0, uncommon: 1, rare: 2, epic: 3, legendary: 4, unique: 5
 const SRC = { drop: '掉落', chest: '宝箱', shop: '商店', forge: '强化', boss: '首领', pet: '宠物' };
 
 /* 控制台自身：版本号、发布页、赞助入口。界面只露版本号，任何地方都不显示仓库地址。 */
-const CONSOLE_VERSION = '2.1.5';
+const CONSOLE_VERSION = '2.1.6';
 const GITHUB_REPO = { owner: 'buguniaoOVO', repo: 'idle-legions-console' };
 const SPONSOR_URL = 'https://afdian.com/a/Awan0v0?utm_source=copylink&utm_medium=link';
 
@@ -162,7 +162,7 @@ window.__backFromConsole = function () {
 
 /* ------------------------------------------------------------------ 框架 */
 
-const TITLES = { inst: '账号状态', loot: '掉落记录', sandbox: '沙箱', settings: '本工具设置' };
+const TITLES = { inst: '账号状态', loot: '掉落记录', helpers: '助手设置', sandbox: '沙箱', settings: '本工具设置' };
 
 function renderChrome(s) {
   const k = s.kpi || {};
@@ -173,6 +173,7 @@ function renderChrome(s) {
   $('#pageSub').textContent = {
     inst: '主机与各沙箱里的游戏、助手与运行状态',
     loot: '所有实例的掉落汇总，越用越全',
+    helpers: '给主机或某个沙箱单独打开助手设置',
     sandbox: 'Sandboxie 检测、助手部署与实例启停',
     settings: '路径、助手版本与运维入口',
   }[state.page];
@@ -371,6 +372,36 @@ function renderLoot(s) {
 }
 
 /* ------------------------------------------------------------------ 沙箱 */
+
+/* 助手设置：先选环境，再打开那个环境里的助手页面 */
+function renderHelpers(s) {
+  const insts = s.instances || [];
+  const boxes = s.boxes || [];
+  const rows = [{ name: '主机', host: true, target: '', helper: s.host.helper }]
+    .concat(boxes.map((b) => ({ name: '沙箱 ' + b.name, host: false, target: b.name, helper: b.helper })));
+
+  const count = $('#helperCount');
+  if (count) count.textContent = rows.length + ' 个';
+
+  const cards = $('#helperCards');
+  if (!cards) return;
+  cards.innerHTML = rows.map((r) => {
+    const inst = insts.find((i) => (r.host ? i.target === '' : i.target === r.target));
+    const hp = r.helper || {};
+    const running = !!inst && !!inst.port;
+    const port = inst ? inst.port : 0;
+    return `<article class="icard">
+      <div class="ihead"><b>${esc(r.name)}</b>
+        <span class="q ${running ? 'uncommon' : 'common'}"><i></i>${running ? '助手运行中' : '助手未运行'}</span></div>
+      <div class="ihint">${hp.installed ? '助手 v' + esc(hp.version || '?') : '未部署'} · <span class="dim">${esc(hp.dir || '')}</span></div>
+      <div class="ifoot">
+        <button class="btn sm primary" data-helper-open="${port}" ${running ? '' : 'disabled'}>打开助手设置</button>
+        <button class="btn sm" data-helper-launch="${esc(r.target)}" ${running ? 'disabled' : ''}>启动助手</button>
+        <button class="btn sm" data-helper-deploy="${esc(r.target)}">重新部署</button>
+      </div>
+    </article>`;
+  }).join('');
+}
 
 function renderSandbox(s) {
   const sb = s.sandbox || {};
@@ -684,6 +715,7 @@ function render() {
   renderChrome(s);
   if (state.page === 'inst') renderInst(s);
   else if (state.page === 'loot') renderLoot(s);
+  else if (state.page === 'helpers') renderHelpers(s);
   else if (state.page === 'sandbox') renderSandbox(s);
   else renderSettings(s);
   if (state.drawer) renderDrawer();
@@ -788,7 +820,7 @@ function closePopMenu() {
 }
 
 document.addEventListener('click', async (ev) => {
-  const t = ev.target.closest('[data-goto],[data-top],[data-pow],[data-win],[data-kill],[data-detail],[data-tab],[data-cfg],[data-run],[data-syncall],[data-rar],[data-src],[data-box-launch],[data-box-deploy],[data-box-show],[data-box-kill],[data-pid-win],[data-pid-kill],[data-op],[data-alias],[data-restart],[data-official],[data-fix],[data-relay],[data-lock],[data-lock-loop],[data-lock-menu],[data-lock-set],[data-global-lock],[data-sponsor],[data-github],[data-exit],[data-check-update]');
+  const t = ev.target.closest('[data-goto],[data-top],[data-pow],[data-win],[data-kill],[data-detail],[data-tab],[data-cfg],[data-run],[data-syncall],[data-rar],[data-src],[data-box-launch],[data-box-deploy],[data-box-show],[data-box-kill],[data-pid-win],[data-pid-kill],[data-op],[data-alias],[data-restart],[data-official],[data-fix],[data-relay],[data-lock],[data-lock-loop],[data-lock-menu],[data-lock-set],[data-global-lock],[data-sponsor],[data-github],[data-exit],[data-check-update],[data-helper-open],[data-helper-launch],[data-helper-deploy]');
   if (!t) return;
   const s = state.snap;
   if (!s) return;
@@ -902,6 +934,24 @@ document.addEventListener('click', async (ev) => {
     }
     await api('/api/quit', {});
     return toast('已退出', 'ok');
+  }
+  if (t.dataset.helperOpen !== undefined) {
+    const port = Number(t.dataset.helperOpen);
+    if (!port) return toast('这个环境还没跑起来，先在沙箱页启动它', 'bad');
+    return openOfficial(port);
+  }
+  if (t.dataset.helperLaunch !== undefined) {
+    const target = t.dataset.helperLaunch;
+    const r = await api('/api/launch', target ? { box: target } : { count: 1 });
+    toast(r.ok ? '已提交启动请求' : (r.error || '启动失败'), r.ok ? 'ok' : 'bad');
+    return setTimeout(() => refresh(true), 3000);
+  }
+  if (t.dataset.helperDeploy !== undefined) {
+    const target = t.dataset.helperDeploy;
+    const scopes = [target || '本机'];
+    const r = await api('/api/deploy', { scopes });
+    toast(r.ok ? '正在部署到 ' + scopes[0] : (r.error || '部署失败'), r.ok ? 'ok' : 'bad');
+    return setTimeout(() => refresh(true), 3000);
   }
   if (t.dataset.checkUpdate) return checkConsoleUpdate(true);
   if (t.dataset.sponsor) return openSponsor();

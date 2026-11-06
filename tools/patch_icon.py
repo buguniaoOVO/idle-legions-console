@@ -21,8 +21,8 @@ def build_frames(src_png):
             # 保留透明通道：RGBA 直接 quantize，会写成带 tRNS 的调色板 PNG
             q = frame.quantize(colors=colors, method=Image.FASTOCTREE)
             buf = io.BytesIO()
-            q.save(buf, format='PNG', optimize=True,
-                   bits=min(8, max(1, (colors - 1).bit_length())))
+            # 不要传 bits=：给调色板 PNG 指定位深会写坏索引，Windows 解出来是花的
+            q.save(buf, format='PNG', optimize=True)
             data = buf.getvalue()
             if len(data) <= budget:
                 chosen = data

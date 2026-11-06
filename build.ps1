@@ -23,13 +23,12 @@ Write-Host '2/3 打包前端资源'
 & $py (Join-Path $PSScriptRoot 'tools\repack.py') $stage1 $stage2 $PSScriptRoot
 if ($LASTEXITCODE -ne 0) { throw 'repack 失败' }
 
-Write-Host '3/3 写入图标'
+Write-Host '3/3 写入图标（PE：图标数据追加到 .reloc 末尾，资源项指过去）'
 Copy-Item $stage2 $stage3 -Force
-$icon = Join-Path $PSScriptRoot 'assets\icon\icon-256.png'
+$icon = Join-Path $PSScriptRoot 'assets\icon\icon-1024.png'
 if (-not (Test-Path $icon)) { $icon = Join-Path $PSScriptRoot '..\icon-work\icon-256.png' }
-Copy-Item $icon (Join-Path $work 'icon.png') -Force
-& $py (Join-Path $PSScriptRoot 'tools\patch_icon.py') $stage3 (Join-Path $work 'icon.png')
-if ($LASTEXITCODE -ne 0) { throw 'patch_icon 失败' }
+& $py (Join-Path $PSScriptRoot 'tools\patch_icon_pe.py') $stage3 $icon
+if ($LASTEXITCODE -ne 0) { throw 'patch_icon_pe 失败' }
 
 Copy-Item $stage3 $Out -Force
 Write-Host ('完成：' + $Out)
