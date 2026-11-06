@@ -43,7 +43,7 @@ const RANK = { common: 0, uncommon: 1, rare: 2, epic: 3, legendary: 4, unique: 5
 const SRC = { drop: '掉落', chest: '宝箱', shop: '商店', forge: '强化', boss: '首领', pet: '宠物' };
 
 /* 控制台自身：版本号、发布页、赞助入口。界面只露版本号，任何地方都不显示仓库地址。 */
-const CONSOLE_VERSION = '2.1.1';
+const CONSOLE_VERSION = '2.1.2';
 const GITHUB_REPO = { owner: 'buguniaoOVO', repo: 'idle-legions-console' };
 const SPONSOR_URL = 'https://afdian.com/a/Awan0v0?utm_source=copylink&utm_medium=link';
 
@@ -195,17 +195,9 @@ function renderChrome(s) {
     sandbox: [['primary', '启动全部沙箱', 'launchall'], ['', '部署全部', 'deployall']],
     settings: [['', '刷新', 'refresh']],
   }[state.page] || [];
-  // 顶部工具条：全局锁帧 + 本页动作 + 退出（退出和开始/停止同一排）
-  const fpsAll = (s.instances || []).map((i) => Number(i.fps || 0));
-  const commonFps = fpsAll.length && fpsAll.every((v) => v === fpsAll[0]) ? fpsAll[0] : null;
-  const lockGroup = ['inst', 'sandbox'].includes(state.page)
-    ? `<div class="lockgroup"><span class="lk-label">锁帧</span>${[10, 30, 0].map((v) =>
-        `<button class="lk ${commonFps === v ? 'on' : ''}" data-global-lock="1" data-fps="${v}"
-          title="全局锁帧：${v === 0 ? '不限制' : '锁定 ' + v + ' 帧'}（写入每个实例 settings.cfg，重启实例生效）">${v === 0 ? '不锁' : v}</button>`).join('')}</div>`
-    : '';
-  $('#topacts').innerHTML = lockGroup
-    + acts.map(([cls, label, act]) => `<button class="btn ${cls}" data-top="${act}">${esc(label)}</button>`).join('')
-    + '<button class="btn exit" data-exit="1" title="退出中控（右上角 X 只是缩到任务栏）">退出</button>';
+  // 顶部只放本页动作；发布页 / 赞助 / 退出在右侧图标组里（和桌面版同一位置）
+  $('#topacts').innerHTML = acts.map(([cls, label, act]) =>
+    `<button class="btn ${cls}" data-top="${act}">${esc(label)}</button>`).join('');
 }
 
 /* ------------------------------------------------------------------ 账号状态 */
@@ -245,8 +237,14 @@ function renderInst(s) {
   $('#envLeft').innerHTML = `<h2>环境</h2><span class="count">${k.boxes} 个沙箱</span>
     <span class="barenv">· Sandboxie ${sb.running ? '运行中' : '未运行'} · 本机 ${hostN} 个 · 沙箱 ${boxN} 个${
       unknownN ? ` · <span style="color:#b54708">${unknownN} 个位置未知</span>` : ''}</span>`;
+  // 环境栏右侧：显示/隐藏窗口 + 全局锁帧总开关（和桌破中控同一位置）
+  const capOn = globalCapOn();
+  // 已锁时显示实例当前档位（可能是卡片上单独设的），没锁时显示默认档位
+  const capFps = capOn ? Number((s.instances || [])[0].fps || globalCapRate()) : globalCapRate();
   $('#envRight').innerHTML = `
     <button class="btn" data-top="togglewin">${k.hidden ? '显示全部窗口' : '隐藏全部窗口'}</button>
+    <button class="btn ${capOn ? 'danger' : ''}" data-global-lock="1" title="全局锁帧：给所有实例写 settings.cfg 的 max_fps，改了即时生效">
+      ${capOn ? `关闭全局锁帧 · ${capFps} 帧` : `开启全局锁帧 · ${capFps} 帧`}</button>
     <button class="btn" data-goto="sandbox">沙箱管理</button>`;
 
   $('#cards').innerHTML = ins.map(card).join('');
@@ -297,11 +295,12 @@ function card(i) {
     </div>` : ''}
     <div class="irecent"><small>最近记录</small><span>${last ? esc(last.m || '') : '暂无动作'}</span></div>
 
-    ${i.target === null ? '' : `<div class="lockrow"><span class="lk-label">锁帧</span>
-      ${[10, 30, 0].map((v) => `<button class="lk ${Number(i.fps || 0) === v ? 'on' : ''}" data-lock="${i.port}" data-fps="${v}" title="${v === 0 ? '不限制帧率' : '锁定 ' + v + ' 帧'}">${v === 0 ? '不锁' : v}</button>`).join('')}
-      <span class="lk-cur">${Number(i.fps || 0) === 0 ? '未锁帧' : i.fps + ' 帧'}</span></div>`}
     <div class="ifoot">
       <button class="btn sm ${i.running ? 'danger' : 'primary'}" data-pow="${i.port}">${i.running ? '停止自动' : '开始自动'}</button>
+      ${i.target === null ? '' : `<span class="locksplit">
+        <button class="btn sm ${Number(i.fps || 0) > 0 ? 'danger' : ''}" data-lock-loop="${i.port}"
+          title="${Number(i.fps || 0) > 0 ? '这个号锁在 ' + i.fps + ' 帧，点一下解除' : '把这个号锁到 ' + globalCapRate() + ' 帧（即时生效）'}">${Number(i.fps || 0) > 0 ? '锁帧 ' + i.fps : '锁帧'}</button>
+        <button class="btn sm lockcaret" data-lock-menu="${i.port}" title="选择 10 / 30 / 不锁">▾</button></span>`}
       <button class="btn sm" data-official="${i.port}">设置</button>
       <button class="btn sm" data-win="${i.port}">${i.hidden ? '显示窗口' : '隐藏窗口'}</button>
       <button class="btn sm" data-detail="${i.port}">详情</button>
@@ -476,6 +475,17 @@ function renderSettings(s) {
         <span class="val">${(s.conf || {}).helper_pkg_ver ? 'v' + esc(s.conf.helper_pkg_ver) : '—'}</span></div>
       <div class="srow"><div class="lbl">配置文件<small>${esc(s.app.confPath)}</small></div>
         <button class="btn sm" data-op="open-conf">打开目录</button></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>锁帧</h2>
+    <div class="rows">
+      <div class="srow"><div class="lbl">全局锁帧档位<small>环境栏「开启全局锁帧」用的档位；单个号可以在卡片上单独设</small></div>
+        <select data-cap-rate>
+          <option value="10" ${globalCapRate() === 10 ? 'selected' : ''}>10 帧</option>
+          <option value="30" ${globalCapRate() === 30 ? 'selected' : ''}>30 帧</option>
+        </select></div>
     </div>
   </div>
 
@@ -730,6 +740,53 @@ async function batchCfg(ports, patch, quiet) {
 
 function allPorts() { return (state.snap.instances || []).map((i) => i.port); }
 
+/* ---------------------------------------------------------------- 锁帧 */
+const CAP_RATE_KEY = 'il-console-cap-rate';
+
+function globalCapRate() {
+  const v = Number(localStorage.getItem(CAP_RATE_KEY) || 10);
+  return v === 30 ? 30 : 10;
+}
+
+function setGlobalCapRate(v) {
+  localStorage.setItem(CAP_RATE_KEY, String(v === 30 ? 30 : 10));
+}
+
+/* 全局锁帧「已开启」= 所有实例都锁在同一个非零档位 */
+function globalCapOn() {
+  const list = (state.snap && state.snap.instances) || [];
+  if (!list.length) return false;
+  const first = Number(list[0].fps || 0);
+  return first > 0 && list.every((i) => Number(i.fps || 0) === first);
+}
+
+/* 写 max_fps：写的是各实例自己的 settings.cfg，游戏里由 cap.gd 每秒读一次，改完即时生效 */
+async function writeFps(scopes, fps, label) {
+  const r = await api('/api/fps', { scopes, fps });
+  if (!r.ok) return toast(r.error || '写入失败', 'bad');
+  const off = (r.results || []).some((x) => x.vsync_off);
+  toast(`${label}：${fps === 0 ? '已解除锁帧' : '锁 ' + fps + ' 帧'}${off ? '（顺带关垂直同步）' : ''}，即时生效`, 'ok');
+  return refresh(true);
+}
+
+function openLockMenu(i, anchor) {
+  const menu = document.querySelector('#popMenu');
+  if (!menu) return;
+  const cur = Number(i.fps || 0);
+  menu.innerHTML = [10, 30, 0].map((v) =>
+    `<button class="popitem ${cur === v ? 'on' : ''}" data-lock-set="${i.port}" data-fps="${v}">${v === 0 ? '不限制' : '锁定 ' + v + ' 帧'}${cur === v ? ' · 当前' : ''}</button>`).join('');
+  menu.classList.remove('hidden');
+  const r = anchor.getBoundingClientRect();
+  const width = 150;
+  menu.style.left = Math.max(8, Math.min(r.left, window.innerWidth - width - 8)) + 'px';
+  menu.style.top = Math.min(r.bottom + 6, window.innerHeight - 130) + 'px';
+}
+
+function closePopMenu() {
+  const menu = document.querySelector('#popMenu');
+  if (menu) menu.classList.add('hidden');
+}
+
 document.addEventListener('click', async (ev) => {
   const t = ev.target.closest('[data-goto],[data-top],[data-pow],[data-win],[data-kill],[data-detail],[data-tab],[data-cfg],[data-run],[data-syncall],[data-rar],[data-src],[data-box-launch],[data-box-deploy],[data-box-show],[data-box-kill],[data-pid-win],[data-pid-kill],[data-op],[data-alias],[data-restart],[data-official],[data-fix],[data-relay],[data-lock],[data-global-lock],[data-sponsor],[data-github],[data-exit],[data-check-update]');
   if (!t) return;
@@ -810,44 +867,33 @@ document.addEventListener('click', async (ev) => {
 
   const byPort = (p) => (s.instances || []).find((x) => x.port === Number(p));
 
-  if (t.dataset.lock) {
-    const i = byPort(t.dataset.lock);
+  if (t.dataset.lockLoop) {
+    const i = byPort(t.dataset.lockLoop);
     if (!i) return;
-    if (i.target === null) return toast('位置未知，不写文件', 'bad');
-    const fps = Number(t.dataset.fps);
-    const name = i.alias || i.account || ('端口 ' + i.port);
-    if (Number(i.fps || 0) === fps && !i.running) return;
-    const r = await api('/api/fps', { scopes: [i.target === '' ? '本机' : i.target], fps });
-    if (!r.ok) return toast(r.error || '写入失败', 'bad');
-    await refresh(true);
-    const off = (r.results || []).some((x) => x.vsync_off);
-    if (i.running && confirm(`${name} 已写入 ${fps === 0 ? '不限制' : fps + ' 帧'}${off ? '（顺带关垂直同步）' : ''}。\n\nmax_fps 只在游戏启动时读，现在重启这个实例让锁帧生效？`)) {
-      await api('/api/kill', { pids: [i.pid] });
-      await new Promise((res) => setTimeout(res, 1200));
-      await api('/api/launch', i.target === '' ? { count: 1 } : { box: i.target });
-      toast(`${name} 正在重启，${fps === 0 ? '已解除锁帧' : '锁帧 ' + fps + ' 帧'} 会在启动时生效`, 'ok');
-      return setTimeout(() => refresh(true), 4000);
-    }
-    return toast(`${name} 已标记 ${fps === 0 ? '不限制' : fps + ' 帧'}，重启实例后生效`, 'ok');
+    const fps = Number(i.fps || 0) > 0 ? 0 : globalCapRate();
+    await writeFps([i.target === '' ? '本机' : i.target], fps, i.alias || i.account || ('端口 ' + i.port));
+    return;
+  }
+  if (t.dataset.lockMenu) {
+    const i = byPort(t.dataset.lockMenu);
+    if (!i) return;
+    openLockMenu(i, t);
+    return;
+  }
+  if (t.dataset.lockSet) {
+    const i = byPort(t.dataset.lockSet);
+    if (!i) return;
+    closePopMenu();
+    await writeFps([i.target === '' ? '本机' : i.target], Number(t.dataset.fps), i.alias || i.account || ('端口 ' + i.port));
+    return;
   }
   if (t.dataset.globalLock !== undefined) {
-    const fps = Number(t.dataset.fps);
+    const on = globalCapOn();
+    const fps = on ? 0 : globalCapRate();
     const scopes = (s.instances || []).filter((x) => x.target !== null).map((x) => (x.target === '' ? '本机' : x.target));
     if (!scopes.length) return toast('没有可写设置的实例', 'bad');
-    const r = await api('/api/fps', { scopes, fps });
-    if (!r.ok) return toast(r.error || '写入失败', 'bad');
-    await refresh(true);
-    const running = (s.instances || []).filter((x) => x.running);
-    if (running.length && confirm(`已给 ${scopes.length} 个位置写入 ${fps === 0 ? '不限制' : fps + ' 帧'}。\n\n重启这 ${running.length} 个正在跑的实例，让锁帧立刻生效？`)) {
-      for (const x of running) {
-        await api('/api/kill', { pids: [x.pid] });
-        await new Promise((res) => setTimeout(res, 900));
-        if (x.target !== null) await api('/api/launch', x.target === '' ? { count: 1 } : { box: x.target });
-      }
-      toast('正在重启实例，启动后按新档位跑', 'ok');
-      return setTimeout(() => refresh(true), 5000);
-    }
-    return toast(`已写入 ${fps === 0 ? '不限制' : fps + ' 帧'}（${scopes.length} 个位置），重启实例后生效`, 'ok');
+    await writeFps(scopes, fps, `${scopes.length} 个实例`);
+    return;
   }
   if (t.dataset.exit !== undefined) {
     if (window.pywebview && window.pywebview.api && window.pywebview.api.quit) {
@@ -1008,6 +1054,11 @@ document.addEventListener('change', async (ev) => {
     const v = t.dataset.type === 'num' ? Number(t.value) : t.value;
     if (t.dataset.type === 'num' && !Number.isFinite(v)) return;
     return batchCfg([i.port], { [t.dataset.cfg]: v }, true);
+  }
+  if (t.dataset.capRate) {
+    setGlobalCapRate(Number(t.value));
+    toast('全局锁帧档位已设为 ' + globalCapRate() + ' 帧', 'ok');
+    return render();
   }
   if (t.dataset.conf) {
     let v = t.value;

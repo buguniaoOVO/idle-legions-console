@@ -393,3 +393,26 @@ main{flex:1;min-width:0;display:flex;flex-direction:column}
 .lockgroup .lk.on{background:var(--blue-soft);border-color:#dbe6ff;color:var(--blue);font-weight:600}
 .btn.exit{color:var(--ink2)}
 .btn.exit:hover{color:var(--red);border-color:#fecdca;background:var(--red-soft)}
+
+/* ---------------------------------------------------------------- 顶栏右侧图标组 / 卡片锁帧 / 弹出菜单 */
+.topsep{width:1px;height:20px;background:var(--line);margin:0 2px}
+.iconbtn.exitbtn:hover{color:var(--red);border-color:#fecdca;background:var(--red-soft)}
+
+.locksplit{display:inline-flex;align-items:stretch}
+.locksplit .btn:first-child{border-top-right-radius:0;border-bottom-right-radius:0}
+.locksplit .lockcaret{border-top-left-radius:0;border-bottom-left-radius:0;border-left:0;padding:0 6px;color:var(--ink3)}
+
+.popmenu{
+  position:fixed;z-index:60;min-width:150px;padding:5px;background:#fff;
+  border:1px solid var(--line);border-radius:8px;box-shadow:0 10px 24px rgba(16,24,40,.14);
+}
+.popmenu.hidden{display:none}
+.popmenu .popitem{
+  display:block;width:100%;text-align:left;padding:7px 10px;border-radius:6px;
+  font-size:12.5px;color:var(--ink2);
+}
+.popmenu .popitem:hover{background:#f6f7f9;color:var(--ink)}
+.popmenu .popitem.on{color:var(--blue);background:var(--blue-soft);font-weight:600}
+
+.btn.danger{color:var(--red);border-color:#fecdca;background:var(--red-soft)}
+.btn.danger:hover{background:#fee4e2}
